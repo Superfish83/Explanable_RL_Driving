@@ -8,6 +8,8 @@ from keras.layers import Dense
 from keras.layers import Flatten
 from math import *
 
+import csv
+
 class ActionWeightLayer(tf.keras.layers.Layer):
   def __init__(self, num_outputs):
     super(ActionWeightLayer, self).__init__()
@@ -18,8 +20,6 @@ class ActionWeightLayer(tf.keras.layers.Layer):
     self.kernel = self.add_weight("kernel",
                                   shape=[int(input_shape[-1]),
                                          self.num_outputs])
-  def set_action_weights(self, weights):
-    self.kernal = weights
 
   def call(self, inputs):
     return tf.math.multiply(inputs, self.kernal)
@@ -32,11 +32,7 @@ class DuelingDQN(keras.Model):
         self.dense2 = Dense(fc2Dims, activation='relu')
         self.dense3 = Dense(fc3Dims, activation='relu')
         self.V = Dense(1, activation=None)
-        #self.A = Dense(n_actions, activation='softplus')
         self.A = Dense(n_actions, activation=None)
-        #self.Aw = ActionWeightLayer(n_actions)
-        #self.Aw.set_action_weights([0.0701, 0.0611, 0.0065, 0.1748, 0.1370])
-        #self.Aw.set_action_weights([1.0, 1.0, 1.0, 1.0, 1.0]) # -> Action Weight가 없는 것과 같은 효과
     
 
     def call(self, state):
@@ -78,6 +74,7 @@ class ReplayBuffer():
         self.reward_memory = np.zeros(self.mem_size, dtype=np.float32)
         self.terminal_memory = np.zeros(self.mem_size, dtype=np.bool8)
         self.tderror_memory = np.zeros(self.mem_size, dtype=np.float32)
+        self.blackbox_memory = np.zeros(self.mem_size, dtype=np.float32)
 
 
     def store_transition(self, state, action, reward, new_state, done, tderror):
@@ -90,20 +87,28 @@ class ReplayBuffer():
         self.reward_memory[index] = reward
         self.terminal_memory[index] = done
         self.tderror_memory[index] = tderror
+        self.blackbox_memory[index] = 1e-7
 
         self.mem_N = max(index, self.mem_N)
+    
+    def set_blackbox(self, cnt):
+        for i in range(cnt):
+            idx = (self.mem_cntr - i) % self.mem_size
+            self.blackbox_memory[idx] = 1.0
     
     def update_tderror(self, index, tderror):
         self.tderror_memory[index] = tderror
 
-    def sample_buffer(self, batch_size, alpha):
+    def sample_buffer(self, batch_size, alpha, exp_no):
 
         # https://numpy.org/doc/stable/reference/random/generated/numpy.random.choice.htm
         if self.per_on: #Prioritized (Stochatic) Sampling
-            
             # (1) Prioritization Based on TD-Error
             sample_scores = self.tderror_memory[:self.mem_N]
-            sample_scores = np.power(sample_scores, 2.0*alpha) + 0.1
+            sample_scores = np.power(sample_scores, alpha) + 0.01
+                
+            #sample_scores += 10.0 * alpha * self.blackbox_memory[:self.mem_N]
+
             sample_prob = sample_scores / np.sum(sample_scores)
             
             # (2) Prioritization Based on Reward
@@ -127,6 +132,11 @@ class ReplayBuffer():
         rewards = self.reward_memory[batch]
         dones = self.terminal_memory[batch]
 
+        with open(f'learn_data_202211119({exp_no}).csv', 'a', encoding='utf-8', newline='') as f: # 샘플링된 데이터 기록
+            wr = csv.writer(f)
+            for i in batch[:10]:
+                wr.writerow([alpha, sample_scores[i], self.tderror_memory[i], self.state_memory[i][0], self.action_memory[i], self.reward_memory[i]])
+
         return batch, states, actions, rewards, new_states, dones
 
 class Agent(): #신경망 학습을 관장하는 클래스
@@ -143,42 +153,38 @@ class Agent(): #신경망 학습을 관장하는 클래스
 
         self.learn_step_counter = 0
         self.memory = ReplayBuffer(mem_size, input_dims, per_on)
+        self.episode_frame_cnt = 0 # BlackBox Prioritization을 위한 카운터
 
         # Double DQN
         self.q_eval = DuelingDQN(n_actions, fc1_dims, fc2_dims, fc3_dims)
         self.q_next = DuelingDQN(n_actions, fc1_dims, fc2_dims, fc3_dims)
 
-        self.action_weights = [1.0, 1.0, 1.0, 1.0, 1.0] #Action weight 초깃값 (적용하지 않은 것과 같은 상태)
-
         self.q_eval.compile(optimizer=Adam(learning_rate=lr), loss = "mse")
         self.q_next.compile(optimizer=Adam(learning_rate=lr), loss = "mse")
 
         self.init_q_next = True
-        #self.q_eval.compile(optimizer=Adam(learning_rate=lr), loss = "mean_squared_error")
-        #self.q_next.compile(optimizer=Adam(learning_rate=lr), loss = "mean_squared_error")
-
-    def set_action_weights(self, weights):
-        self.action_weights = weights
-        self.q_eval.Aw.set_action_weights(weights)
-        self.q_next.Aw.set_action_weights(weights)
 
 
     def store_transition(self, state, action, reward, new_state, done, pred):
-        
         #TD-Error 계산
         target = reward + np.max(self.gamma*self.q_next(np.array([new_state]))*(1-int(done)))
         tderror = abs(target - pred)
         #print('TD-Error:', tderror)
 
         self.memory.store_transition(state, action, reward, new_state, done, tderror)
+        self.episode_frame_cnt += 1
+        
+        if done:
+            if reward != 0:
+                #BlackBox Prioritization을 위한 점수 배정
+                self.memory.set_blackbox(min(self.episode_frame_cnt, 10))
+            self.episode_frame_cnt = 0
     
     def choose_action(self, observation):
         state = np.array([observation])
         
         if np.random.random() < self.epsilon:
-            weight = np.power(self.action_weights, self.epsilon)
-            weight = weight / np.sum(weight)
-            action = np.random.choice(self.action_space, p=weight)
+            action = np.random.choice(self.action_space)
         else:
             actions = self.q_eval.advantage(state)
             action = tf.math.argmax(actions, axis=1).numpy()[0]
@@ -186,12 +192,12 @@ class Agent(): #신경망 학습을 관장하는 클래스
         pred = np.max(self.q_eval(state))
         return action, pred
     
-    def learn(self):
+    def learn(self, exp_no):
         if self.memory.mem_N < self.batch_size:
-            return
+            return 0.0
         
         batch, states, actions, rewards, states_, dones = \
-            self.memory.sample_buffer(self.batch_size, self.epsilon)
+            self.memory.sample_buffer(self.batch_size, self.epsilon, exp_no)
             #alpha ~ 1.0 ~ 0.0
 
         if self.learn_step_counter % self.replace == 0:
@@ -224,6 +230,8 @@ class Agent(): #신경망 학습을 관장하는 클래스
         #else:
         #    self.epsilon = self.eps_end
         self.learn_step_counter += 1
+
+        return loss
 
     def save_model(self, path):
         self.q_eval.save_weights(path)

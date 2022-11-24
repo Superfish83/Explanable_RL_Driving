@@ -115,7 +115,7 @@ class DriveSimulator(object):
         sim_cur_state = np.array([
             self.agtV, #에이전트 속력
             (self.agtPos[0]-self.FINISH_LANE)/200.0, # 도착점까지 거리
-            (self.agtPos[0]-self.CENTER_LANE)/200.0, # 중앙 차선까지 거리
+            (self.agtPos[1]-self.CENTER_LANE)/200.0, # 중앙 차선까지 거리
             self.agtRot, #에이전트 방향 (도착점 기준)
             self.get_obs_dist()/200.0, #장애물까지 거리
             self.get_obs_dir()]) #에이전트 방향(장애물 기준)
@@ -180,7 +180,7 @@ class DriveSimulator(object):
             self.sim_over = True
             self.sim_over_why = '장애물 회피 성공'
             self.win_count += 1
-            self.stpRwd = 10.0
+            self.stpRwd = 10.0 - self.t / 50
 
         # 회피하지 못한 경우 3가지
         if self.get_obs_dist() < 0:
@@ -193,7 +193,7 @@ class DriveSimulator(object):
             self.sim_over_why = '경로 이탈'
             self.stpRwd = -5.0
             
-        if self.t >= 300: #300 Ticks 안에 목표에 도달하지 못하면 종료
+        if self.t >= 500: #500 Ticks 안에 목표에 도달하지 못하면 종료
             self.sim_over = True
             self.sim_over_why = '시간 초과'
             self.stpRwd = -5.0
