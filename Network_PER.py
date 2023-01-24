@@ -101,22 +101,13 @@ class ReplayBuffer():
 
     def sample_buffer(self, batch_size, alpha, exp_no):
 
+        sample_scores = self.tderror_memory[:self.mem_N]
+        sample_scores = np.power(sample_scores, alpha) + 0.001
         # https://numpy.org/doc/stable/reference/random/generated/numpy.random.choice.htm
         if self.per_on: #Prioritized (Stochatic) Sampling
             # (1) Prioritization Based on TD-Error
-            sample_scores = self.tderror_memory[:self.mem_N]
-            sample_scores = np.power(sample_scores, alpha) + 0.01
-                
-            #sample_scores += 10.0 * alpha * self.blackbox_memory[:self.mem_N]
 
             sample_prob = sample_scores / np.sum(sample_scores)
-            
-            # (2) Prioritization Based on Reward
-            #sample_scores = self.reward_memory[:self.mem_N]
-            #print(sample_scores)
-            #sample_scores = np.abs(sample_scores) + 1.0
-            #sample_scores = np.power(sample_scores, alpha)
-            #sample_prob = sample_scores / np.sum(sample_scores)
             
             batch = np.random.choice(self.mem_N, batch_size, replace=False, p=sample_prob)
 
@@ -132,17 +123,17 @@ class ReplayBuffer():
         rewards = self.reward_memory[batch]
         dones = self.terminal_memory[batch]
 
-        with open(f'learn_data_202211119({exp_no}).csv', 'a', encoding='utf-8', newline='') as f: # 샘플링된 데이터 기록
+        with open(f'learn_data_20221224({exp_no}).csv', 'a', encoding='utf-8', newline='') as f: # 샘플링된 데이터 기록
             wr = csv.writer(f)
             for i in batch[:10]:
-                wr.writerow([alpha, sample_scores[i], self.tderror_memory[i], self.state_memory[i][0], self.action_memory[i], self.reward_memory[i]])
+                wr.writerow([alpha, sample_scores[i], self.tderror_memory[i], self.state_memory[i], self.action_memory[i], self.reward_memory[i]])
 
         return batch, states, actions, rewards, new_states, dones
 
 class Agent(): #신경망 학습을 관장하는 클래스
     def __init__(self, lr, gamma, n_actions, epsilon, batch_size, input_dims, per_on,
         eps_dec = 1e-4, eps_end = 0.01, mem_size = 500000, fc1_dims=128,
-        fc2_dims=128, fc3_dims=32, replace = 100):
+        fc2_dims=128, fc3_dims=32, replace = 150):
         self.action_space = [i for i in range(n_actions)]
         self.gamma = gamma
         self.epsilon = epsilon
@@ -173,12 +164,6 @@ class Agent(): #신경망 학습을 관장하는 클래스
 
         self.memory.store_transition(state, action, reward, new_state, done, tderror)
         self.episode_frame_cnt += 1
-        
-        if done:
-            if reward != 0:
-                #BlackBox Prioritization을 위한 점수 배정
-                self.memory.set_blackbox(min(self.episode_frame_cnt, 10))
-            self.episode_frame_cnt = 0
     
     def choose_action(self, observation):
         state = np.array([observation])
@@ -202,7 +187,7 @@ class Agent(): #신경망 학습을 관장하는 클래스
 
         if self.learn_step_counter % self.replace == 0:
             self.q_next.set_weights(self.q_eval.get_weights())
-            #print("q_next weight set!")
+            print("q_next weight set!")
         q_pred = self.q_eval(states)
         q_next = self.q_next(states_)
         q_target = q_pred.numpy()

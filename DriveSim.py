@@ -43,7 +43,7 @@ class DriveSimulator(object):
         # Traffic lanes
         self.CENTER_LANE = self.SCREEN_H/2
         self.FINISH_LANE = self.SCREEN_W-100
-
+        
         # Initialize episode count
         self.episode_count = 0
         self.win_count = 0
@@ -70,7 +70,7 @@ class DriveSimulator(object):
         self.agtSize = (60,40)
         self.agtPos = (100, self.CENTER_LANE - self.agtSize[1]/2)
         self.agtRot = -math.pi/2
-        self.agtV = 5.0
+        self.agtV = 0.0
         self.agtRect = pygame.Rect(self.agtPos, self.agtSize)
         self.agtImg_org = pygame.image.load("carimg.png").convert()
         self.agtImg = pygame.transform.rotate(self.agtImg_org, self.agtRot*180/math.pi)
@@ -120,11 +120,12 @@ class DriveSimulator(object):
             self.get_obs_dist()/200.0, #장애물까지 거리
             self.get_obs_dir()]) #에이전트 방향(장애물 기준)
 
-        if sim_state.size == 0:
-            sim_state = np.array([sim_cur_state, sim_cur_state, sim_cur_state, sim_cur_state])
-        else:
-            sim_state = np.array([sim_cur_state, sim_state[0], sim_state[1], sim_state[2]])
+        #if sim_state.size == 0:
+        #    sim_state = np.array([sim_cur_state, sim_cur_state, sim_cur_state, sim_cur_state])
+        #else:
+        #    sim_state = np.array([sim_cur_state, sim_state[0], sim_state[1], sim_state[2]])
 
+        sim_state = sim_cur_state
         return sim_state
 
     def step(self, action):
@@ -180,28 +181,32 @@ class DriveSimulator(object):
             self.sim_over = True
             self.sim_over_why = '장애물 회피 성공'
             self.win_count += 1
-            self.stpRwd = 10.0 - self.t / 50
+            self.stpRwd = 5.0
 
         # 회피하지 못한 경우 3가지
         if self.get_obs_dist() < 0:
             self.sim_over = True
             self.sim_over_why = '장애물과 충돌'
-            self.stpRwd = -5.0
+            self.stpRwd = -3.0
         
         if self.agtPos[1] < 0 or self.agtPos[1] + self.agtSize[1] > self.SCREEN_H or self.agtPos[0] < 0:
             self.sim_over = True
             self.sim_over_why = '경로 이탈'
-            self.stpRwd = -5.0
+            self.stpRwd = -3.0
             
-        if self.t >= 500: #500 Ticks 안에 목표에 도달하지 못하면 종료
+        if self.t >= 400: #300 Ticks 안에 목표에 도달하지 못하면 종료
             self.sim_over = True
             self.sim_over_why = '시간 초과'
-            self.stpRwd = -5.0
+            self.stpRwd = -3.0
 
-        # 중앙선으로부터 떨어진 정도에 따라 음의 보상
-        #self.stpRwd -= abs(self.agtPos[1]-self.CENTER_LANE)/1000.0
-        # 목표지점에 가까워지는 속도 기준으로 양의 보상
-        #self.stpRwd += -self.agtV*math.sin(self.agtRot)/1000.0
+        if self.sim_over:
+            #print(abs(self.agtPos[1]-self.CENTER_LANE)/self.CENTER_LANE)
+            #print(2*(self.agtPos[0]-self.FINISH_LANE)/self.FINISH_LANE)
+            #print('------')
+            # 중앙선으로부터 떨어진 정도에 따라 음의 보상
+            self.stpRwd -= abs(self.agtPos[1]-self.CENTER_LANE)/(self.CENTER_LANE*2)
+            # 목표지점과의 거리 기준으로 음의 보상
+            self.stpRwd += 2*(self.agtPos[0]-self.FINISH_LANE)/self.FINISH_LANE
 
         self.agtRwd += self.stpRwd # 누적 보상 저장
 

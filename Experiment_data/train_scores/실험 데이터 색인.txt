@@ -1,0 +1,29 @@
+test_20221014_concat -> Value-based PER
+test_20221016_concat -> TD-Error-Squared-based PER
+test_20221017_concat -> Random Sampling
+test_20221018_concat -> Random Sampling + Action Weight
+
+test_20221115 -> BlackBox Prioritization (뒷부분)
+test_20221116 -> BlackBox Prioritization (앞부분)
+test_20221117 -> Biased Exploration (앞부분)
+
+test_20221119 -> 일반 PER (샘플링 데이터 분석용)
+
+
+
+test_20221129 -> PER 없을때 프레임 분포
+test_20221130 -> PER 있을때 프레임 분포
+
+test_20221209 -> lr=0.0005 with PER
+
+test_20221212 -> lr=0.0005, gamma=0.995 with(0~2)/without(3~5) PER
+test_20221217 -> lr=0.0005, gamma=0.999, replace=200 with PER (X)
+test_20221219 -> lr=0.0005, gamma=0.999, replace=50 with PER
+test_20221220 -> lr=0.003, gamma=0.999, replace=500 with(0~2)/without(3~5) PER (X)
+test_20221221 -> lr=[0.003, 0.001, 0.0005], gamma=0.999, replace=250 with PER
+
+(실패) test_20221222 -> lr=0.003, gamma=0.999, replace=400 with PER
+(실패) test_20221222 -> lr=0.003, gamma=0.999, replace=250 with PER
+
+test_20221223 -> lr=0.001, gamma=0.999, replace=200 with(0~2)/without(3~5) PER
+test_20221224 -> lr=0.001, gamma=0.999, replace=200 with(0~2)/without(3~5) PER
