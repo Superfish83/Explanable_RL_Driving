@@ -120,7 +120,7 @@ class Agent(): #신경망 학습을 관장하는 클래스
         self.replace = replace
         self.batch_size = batch_size
 
-        self.rwd_components = 3
+        self.rwd_components = 5
         self.learn_step_counter = 0
         self.memory = ReplayBuffer(mem_size, input_dims, per_on, self.rwd_components)
         self.episode_frame_cnt = 0 # BlackBox Prioritization을 위한 카운터

@@ -75,7 +75,7 @@ class DriveSimulator(object):
         self.agtRect = pygame.Rect(self.agtPos, self.agtSize)
         self.agtImg_org = pygame.image.load("carimg.png").convert()
         self.agtImg = pygame.transform.rotate(self.agtImg_org, self.agtRot*180/math.pi)
-        self.agtRwd = np.zeros(3) # 축적된 보상
+        self.agtRwd = np.zeros(5) # 축적된 보상
         
         # Obs(Obstacle)
         self.obsRad = 100 #random.randint(75,125)
@@ -188,23 +188,21 @@ class DriveSimulator(object):
 
         # (2-1)
         # 에이전트 판단 근거 표시
+        decomposition = ['Get to Finish', 'Collide with Obstacle', 'Collide with Wall', 'Time Limit', 'Speed Limit']
         if len(pred_C) > 0:
-            my_font = pygame.font.SysFont('NanumGothic', 30)
-            txt = 'Predicted Value: '
+            my_font = pygame.font.SysFont('NanumGothic', 20)
             for i in range(len(pred_C)):
                 pred = np.array(pred_C[i])[0,action]
                 pred = round(pred, 3)
-                txt += f'{pred}, '
-            txt = txt[:-2]
-            text_surface = my_font.render(txt, False, (255,255,255))
-
-            self.screen.blit(text_surface, (20, self.SCREEN_H + 20))
+                txt = decomposition[i] + ' : ' + str(pred)
+                text_surface = my_font.render(txt, False, (255,255,255))
+                self.screen.blit(text_surface, (20, self.SCREEN_H + 20+ 25*i))
 
 
 
         # (4)
         # 보상 결정하기
-        self.stpRwd = np.zeros(3) # Step Reward [회피/충돌, 시간초과, 과속] -> Reward 분리
+        self.stpRwd = np.zeros(5) # Step Reward [목표도착, 장애물충돌, 경로이탈, 시간초과, 과속] -> Reward 분리
         self.sim_over = False
         self.sim_over_why = ''
 
@@ -219,20 +217,20 @@ class DriveSimulator(object):
         if self.get_obs_dist() < 0:
             self.sim_over = True
             self.sim_over_why = '장애물과 충돌'
-            self.stpRwd[0] = -3.0
+            self.stpRwd[1] = -3.0
         
         if self.agtPos[1] < 0 or self.agtPos[1] + self.agtSize[1] > self.SCREEN_H or self.agtPos[0] < 0:
             self.sim_over = True
             self.sim_over_why = '경로 이탈'
-            self.stpRwd[0] = -3.0
+            self.stpRwd[2] = -3.0
             
         if self.t >= 500: #500 Ticks 안에 목표에 도달하지 못하면 종료
             self.sim_over = True
             self.sim_over_why = '시간 초과'
-            self.stpRwd[1] = -3.0
+            self.stpRwd[3] = -3.0
 
         if self.agtV >= 10.0: #과속 시
-            self.stpRwd[2] = -0.01
+            self.stpRwd[4] = -0.01
 
 
         # 중앙선으로부터 떨어진 정도에 따라 음의 보상
