@@ -39,7 +39,7 @@ class DriveSimulator(object):
         # Screen size
         self.SCREEN_W = 1000
         self.SCREEN_H = 500
-        self.STATUS_H = 100 # Agent status monitor below screen
+        self.STATUS_H = 500 # Agent status monitor below screen
 
         # Traffic lanes
         self.CENTER_LANE = self.SCREEN_H/2
@@ -75,7 +75,7 @@ class DriveSimulator(object):
         self.agtRect = pygame.Rect(self.agtPos, self.agtSize)
         self.agtImg_org = pygame.image.load("carimg.png").convert()
         self.agtImg = pygame.transform.rotate(self.agtImg_org, self.agtRot*180/math.pi)
-        self.agtRwd = 0.0 # 축적된 보상
+        self.agtRwd = np.zeros(3) # 축적된 보상
         
         # Obs(Obstacle)
         self.obsRad = 100 #random.randint(75,125)
@@ -113,9 +113,7 @@ class DriveSimulator(object):
         return math.sqrt(dsquare) - self.obsRad - 20
 
     def get_sim_state(self):
-        sim_state = self.sim_state
-
-        sim_cur_state = np.array([
+        self.sim_state = np.array([
             self.agtV, #에이전트 속력
             (self.agtPos[0]-self.FINISH_LANE)/200.0, # 도착점까지 거리
             (self.agtPos[1]-self.CENTER_LANE)/200.0, # 중앙 차선까지 거리
@@ -123,14 +121,9 @@ class DriveSimulator(object):
             self.get_obs_dist()/200.0, #장애물까지 거리
             self.get_obs_dir()]) #에이전트 방향(장애물 기준)
 
-        if sim_state.size == 0:
-            sim_state = np.array([sim_cur_state, sim_cur_state, sim_cur_state, sim_cur_state])
-        else:
-            sim_state = np.array([sim_cur_state, sim_state[0], sim_state[1], sim_state[2]])
+        return self.sim_state
 
-        return sim_state
-
-    def step(self, action):
+    def step(self, action, pred_C):
         pygame.event.pump()
         self.t += 1
 
@@ -147,6 +140,8 @@ class DriveSimulator(object):
         elif action == 4:
             self.agtRot -= math.pi/24
         #에이전트 업데이트
+
+
         
         # (2)
         # 화면 그리기
@@ -189,16 +184,27 @@ class DriveSimulator(object):
         # 장애물 그리기
         pygame.draw.circle(self.screen, self.COLOR_OBS, self.obsPos, self.obsRad)
 
-        my_font = pygame.font.SysFont('NanumGothic', 30)
 
-        text_surface = my_font.render('Before Training', False, (255,150,150))
 
-        self.screen.blit(text_surface, (20,20))
+        # (2-1)
+        # 에이전트 판단 근거 표시
+        if len(pred_C) > 0:
+            my_font = pygame.font.SysFont('NanumGothic', 30)
+            txt = 'Predicted Value: '
+            for i in range(len(pred_C)):
+                pred = np.array(pred_C[i])[0,action]
+                pred = round(pred, 3)
+                txt += f'{pred}, '
+            txt = txt[:-2]
+            text_surface = my_font.render(txt, False, (255,255,255))
+
+            self.screen.blit(text_surface, (20, self.SCREEN_H + 20))
+
 
 
         # (4)
         # 보상 결정하기
-        self.stpRwd = 0.0 # Step Reward
+        self.stpRwd = np.zeros(3) # Step Reward [회피/충돌, 시간초과, 과속] -> Reward 분리
         self.sim_over = False
         self.sim_over_why = ''
 
@@ -207,23 +213,27 @@ class DriveSimulator(object):
             self.sim_over = True
             self.sim_over_why = '장애물 회피 성공'
             self.win_count += 1
-            self.stpRwd = 10.0 - self.t / 50
+            self.stpRwd[0] = 5.0
 
-        # 회피하지 못한 경우 3가지
+        # 회피하지 못한 경우
         if self.get_obs_dist() < 0:
             self.sim_over = True
             self.sim_over_why = '장애물과 충돌'
-            self.stpRwd = -5.0
+            self.stpRwd[0] = -3.0
         
         if self.agtPos[1] < 0 or self.agtPos[1] + self.agtSize[1] > self.SCREEN_H or self.agtPos[0] < 0:
             self.sim_over = True
             self.sim_over_why = '경로 이탈'
-            self.stpRwd = -5.0
+            self.stpRwd[0] = -3.0
             
         if self.t >= 500: #500 Ticks 안에 목표에 도달하지 못하면 종료
             self.sim_over = True
             self.sim_over_why = '시간 초과'
-            self.stpRwd = -5.0
+            self.stpRwd[1] = -3.0
+
+        if self.agtV >= 10.0: #과속 시
+            self.stpRwd[2] = -0.01
+
 
         # 중앙선으로부터 떨어진 정도에 따라 음의 보상
         #self.stpRwd -= abs(self.agtPos[1]-self.CENTER_LANE)/1000.0
@@ -243,7 +253,7 @@ class DriveSimulator(object):
         if(self.sim_over or self.t % 3 == 0): #Frame Skipping (3프레임마다 의사 결정)
             return self.sim_state, self.stpRwd, self.sim_over
         else:
-            self.step(0)
+            self.step(0, pred_C)
             return self.sim_state, self.stpRwd, self.sim_over
     
     def quit(self):
