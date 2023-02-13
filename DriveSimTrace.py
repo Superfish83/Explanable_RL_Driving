@@ -39,7 +39,7 @@ class DriveSimulator(object):
         # Screen size
         self.SCREEN_W = 1000
         self.SCREEN_H = 500
-        self.STATUS_H = 500 # Agent status monitor below screen
+        self.STATUS_H = 200 # Agent status monitor below screen
 
         # Traffic lanes
         self.CENTER_LANE = self.SCREEN_H/2
@@ -249,7 +249,7 @@ class DriveSimulator(object):
         pygame.display.flip()
         self.clock.tick(self.frame_rate)
 
-        if(self.sim_over or self.t % 3 == 0): #Frame Skipping (3프레임마다 의사 결정)
+        if(self.sim_over or self.t % 5 == 0): #Frame Skipping (5프레임마다 의사 결정)
             return self.sim_state, self.stpRwd, self.sim_over
         else:
             self.step(0, pred_C)
