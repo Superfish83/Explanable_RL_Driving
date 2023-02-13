@@ -114,6 +114,7 @@ class DriveSimulator(object):
 
     def get_sim_state(self):
         self.sim_state = np.array([
+            self.t/500.0, #현재까지 지난 시간(1.0 도달 시 시간초과)
             self.agtV, #에이전트 속력
             (self.agtPos[0]-self.FINISH_LANE)/200.0, # 도착점까지 거리
             (self.agtPos[1]-self.CENTER_LANE)/200.0, # 중앙 차선까지 거리
