@@ -85,7 +85,7 @@ class ReplayBuffer():
     def sample_buffer(self, batch_size, alpha, exp_no):
 
         sample_scores = self.tderror_memory[:self.mem_N]
-        sample_scores = np.power(sample_scores, alpha*2) + 0.001
+        sample_scores = np.power(sample_scores, alpha) + 0.01
         # https://numpy.org/doc/stable/reference/random/generated/numpy.random.choice.htm
         if self.per_on: #Prioritized (Stochatic) Sampling
             # (1) Prioritization Based on TD-Error
@@ -181,7 +181,7 @@ class Agent(): #신경망 학습을 관장하는 클래스
         max_actions = actions.argmax(axis=1)
         #print(max_actions)
         
-        return max_actions
+        return max_actions, np.max(actions, axis=1)
     
     def learn(self, exp_no):
         if self.memory.mem_N < self.batch_size:
@@ -197,30 +197,29 @@ class Agent(): #신경망 학습을 관장하는 클래스
             print("q_next weight set!")
         
         
-        max_actions = self.choose_actions(states_)
         loss = np.zeros(self.rwd_components)
 
+        q_t = np.zeros((len(dones), len(self.action_space))) # 전체 Component를 합산한 target Q 값
         for i in range(self.rwd_components):
             q_pred = self.q_evals[i](states)
             q_next = self.q_nexts[i](states_)
             q_target = q_pred.numpy()
 
-            #max_actions = tf.math.argmax(self.q_evals[i](states_), axis=1)
-
             #Component별 target Q value 계산
-            tderror = 0.0
             for idx, terminal in enumerate(dones):
-                action, pred = self.choose_action(states[idx])
                 q_target[idx, actions[idx]] = rewards[idx, i] + \
-                    self.gamma*q_next[idx, max_actions[idx]]*(1-int(dones[idx]))
-
-                tderror += abs(np.max(q_target[idx]) - pred)
-            memory_idx = batch[idx]
-            self.memory.update_tderror(memory_idx, tderror)
-            #데이터 학습에 사용 후 저장된 TD-Error 값 업데이트
+                    self.gamma*(np.max(q_next[idx]))*(1-int(dones[idx]))
+            
+            q_t += q_target
 
             #Conponent별 Q function 학습
             loss[i] = self.q_evals[i].train_on_batch(states, q_target)
+        
+        #데이터 학습에 사용 후 저장된 TD-Error 값 업데이트 (모든 Reward Compoenent 고려)
+        max_actions, pred = self.choose_actions(states)
+        for idx in range(len(dones)):
+            tderror = abs(np.max(q_t[idx]) - pred[idx])
+            self.memory.update_tderror(batch[idx], tderror)
 
         #print(loss)
         # epsilon 조정은 훈련 코드에서 수동으로 하는 걸로 조정함. (20220920)

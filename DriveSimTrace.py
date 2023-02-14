@@ -114,7 +114,7 @@ class DriveSimulator(object):
 
     def get_sim_state(self):
         self.sim_state = np.array([
-            self.t/500.0, #현재까지 지난 시간(1.0 도달 시 시간초과)
+            self.t/400.0, #현재까지 지난 시간(1.0 도달 시 시간초과)
             self.agtV, #에이전트 속력
             (self.agtPos[0]-self.FINISH_LANE)/200.0, # 도착점까지 거리
             (self.agtPos[1]-self.CENTER_LANE)/200.0, # 중앙 차선까지 거리
@@ -226,12 +226,12 @@ class DriveSimulator(object):
             self.sim_over_why = '경로 이탈'
             self.stpRwd[2] = -3.0
             
-        if self.t >= 500: #500 Ticks 안에 목표에 도달하지 못하면 종료
+        if self.t >= 400: #500 Ticks 안에 목표에 도달하지 못하면 종료
             self.sim_over = True
             self.sim_over_why = '시간 초과'
             self.stpRwd[3] = -3.0
 
-        if self.agtV >= 7.0 or self.agtV <= -5.0: #과속 시
+        if self.agtV >= 7.0 or self.agtV <= -0.5: #과속 시
             self.stpRwd[4] = -0.01
             text_surface = my_font.render("High Speed!", False, (255,255,255))
             self.screen.blit(text_surface, (self.agtPos[0]+60, self.agtPos[1]+30))
@@ -254,7 +254,7 @@ class DriveSimulator(object):
         pygame.display.flip()
         self.clock.tick(self.frame_rate)
 
-        if(self.sim_over or self.t % 5 == 0): #Frame Skipping (5프레임마다 의사 결정)
+        if(self.sim_over or self.t % 3 == 0): #Frame Skipping (5프레임마다 의사 결정)
             return self.sim_state, self.stpRwd, self.sim_over
         else:
             self.step(0, pred_C)
