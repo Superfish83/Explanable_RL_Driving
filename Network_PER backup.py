@@ -21,7 +21,7 @@ class DuelingDQN(keras.Model):
     
 
     def call(self, state):
-        x = self.flatten(state)
+        x = state
         x = self.dense1(x)
         x = self.dense2(x)
         V = self.V(x)
@@ -31,7 +31,7 @@ class DuelingDQN(keras.Model):
         return Q
 
     def advantage(self, state):
-        x = self.flatten(state)
+        x = state
         x = self.dense1(x)
         x = self.dense2(x)
         A = self.A(x)

@@ -77,7 +77,7 @@ class DriveSimulator(object):
         self.agtRwd = 0.0 # 축적된 보상
         
         # Obs(Obstacle)
-        self.obsRad = 100 #random.randint(75,125)
+        self.obsRad = random.randint(75,125)
         self.obsPos = (600, random.randint(self.obsRad, self.SCREEN_H - self.obsRad))
 
         # Initialize sim_state

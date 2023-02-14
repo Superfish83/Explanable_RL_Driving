@@ -113,20 +113,13 @@ class DriveSimulator(object):
         return math.sqrt(dsquare) - self.obsRad - 20
 
     def get_sim_state(self):
-        sim_cur_state = np.array([
-            (self.agtPos[0]-self.FINISH_LANE), # 에이전트 위치 (x)
-            (self.agtPos[1]-self.CENTER_LANE), # 에이전트 위치 (y)
-            (self.obsPos[0] - self.agtPos[0]), # 장애물 위치 (x)
-            (self.obsPos[0] - self.agtPos[1]), # 장애물 위치 (y)
-            (self.obsRad)])                    # 장애물 크기
-
-        sim_cur_state /= 200.0 #정규화(normalization)
-
-        sim_state = self.sim_state
-        if sim_state.size == 0:
-            self.sim_state = np.array([sim_cur_state, sim_cur_state, sim_cur_state, sim_cur_state])
-        else:
-            self.sim_state = np.array([sim_cur_state, sim_state[0], sim_state[1], sim_state[2]])
+        self.sim_state = np.array([
+            self.agtV, #에이전트 속력
+            (self.agtPos[0]-self.FINISH_LANE)/200.0, # 도착점까지 거리
+            (self.agtPos[1]-self.CENTER_LANE)/200.0, # 중앙 차선까지 거리
+            self.agtRot, #에이전트 방향 (도착점 기준)
+            self.get_obs_dist()/200.0, #장애물까지 거리
+            self.get_obs_dir()]) #에이전트 방향(장애물 기준)
 
         return self.sim_state
 
@@ -142,7 +135,6 @@ class DriveSimulator(object):
             self.agtV += 0.5
         elif action == 2:
             self.agtV -= 0.5
-            self.agtV = max(self.agtV, 0.0)
         elif action == 3:
             self.agtRot += math.pi/24
         elif action == 4:
@@ -233,37 +225,41 @@ class DriveSimulator(object):
             self.sim_over_why = '경로 이탈'
             self.stpRwd[2] = -3.0
             
-        if self.t >= 400: #400 Ticks 안에 목표에 도달하지 못하면 종료
+        if self.t >= 400: #500 Ticks 안에 목표에 도달하지 못하면 종료
             self.sim_over = True
             self.sim_over_why = '시간 초과'
 
         # 시간 경과에 따른 페널티
-        self.stpRwd[3] = -0.005
+        self.stpRwd[3] = -0.002
 
-        if self.agtV >= 7.0: #과속 시
-            self.stpRwd[4] = -0.03
+        if self.agtV >= 10.0 or self.agtV <= -2.0: #과속 시
+            self.stpRwd[4] = -0.01
             text_surface = my_font.render("High Speed!", False, (255,255,255))
             self.screen.blit(text_surface, (self.agtPos[0]+60, self.agtPos[1]+30))
+
+
+        # 중앙선으로부터 떨어진 정도에 따라 음의 보상
+        #self.stpRwd -= abs(self.agtPos[1]-self.CENTER_LANE)/1000.0
+        # 목표지점에 가까워지는 속도 기준으로 양의 보상
+        #self.stpRwd += -self.agtV*math.sin(self.agtRot)/1000.0
 
         self.agtRwd += self.stpRwd # 누적 보상 저장
 
         text_surface = my_font.render(f"Accumulated Reward: {self.agtRwd}", False, (255,255,255))
         self.screen.blit(text_surface, (20, self.SCREEN_H + 20 + 25*len(pred_C)))
 
-
+        #Update sim_state
+        self.sim_prev_state = self.sim_state
+        self.sim_state = self.get_sim_state()
         
         pygame.display.flip()
         self.clock.tick(self.frame_rate)
 
-        if(self.sim_over or self.t % 3 == 0): #Frame Skipping (3프레임마다 의사 결정)
-            #Update sim_state
-            self.sim_prev_state = self.sim_state
-            self.sim_state = self.get_sim_state()
+        if(self.sim_over or self.t % 3 == 0): #Frame Skipping (5프레임마다 의사 결정)
             return self.sim_state, self.stpRwd, self.sim_over
         else:
-            r = self.stpRwd
-            s, r_, o = self.step(0, pred_C)
-            return s, r+r_, o
+            self.step(0, pred_C)
+            return self.sim_state, self.stpRwd, self.sim_over
     
     def quit(self):
         pygame.quit()
