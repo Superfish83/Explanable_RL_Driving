@@ -85,7 +85,7 @@ class ReplayBuffer():
     def sample_buffer(self, batch_size, alpha, exp_no):
 
         sample_scores = self.tderror_memory[:self.mem_N]
-        sample_scores = np.power(sample_scores, alpha) + 0.001
+        sample_scores = np.power(sample_scores, alpha*2) + 0.001
         # https://numpy.org/doc/stable/reference/random/generated/numpy.random.choice.htm
         if self.per_on: #Prioritized (Stochatic) Sampling
             # (1) Prioritization Based on TD-Error
@@ -111,7 +111,7 @@ class ReplayBuffer():
 class Agent(): #신경망 학습을 관장하는 클래스
     def __init__(self, lr, gamma, n_actions, epsilon, batch_size, input_dims, per_on,
         eps_dec = 1e-4, eps_end = 0.01, mem_size = 500000, fc1_dims=128,
-        fc2_dims=128, replace = 150):
+        fc2_dims=128, replace = 20):
         self.action_space = [i for i in range(n_actions)]
         self.gamma = gamma
         self.epsilon = epsilon
@@ -208,15 +208,16 @@ class Agent(): #신경망 학습을 관장하는 클래스
             #max_actions = tf.math.argmax(self.q_evals[i](states_), axis=1)
 
             #Component별 target Q value 계산
+            tderror = 0.0
             for idx, terminal in enumerate(dones):
-                #action, pred = self.choose_action(states[idx])
+                action, pred = self.choose_action(states[idx])
                 q_target[idx, actions[idx]] = rewards[idx, i] + \
                     self.gamma*q_next[idx, max_actions[idx]]*(1-int(dones[idx]))
 
-                #memory_idx = batch[idx]
-                #tderror = abs(np.max(q_target[idx]) - pred)
-                #self.memory.update_tderror(memory_idx, tderror)
-                #데이터 학습에 사용 후 저장된 TD-Error 값 업데이트
+                tderror += abs(np.max(q_target[idx]) - pred)
+            memory_idx = batch[idx]
+            self.memory.update_tderror(memory_idx, tderror)
+            #데이터 학습에 사용 후 저장된 TD-Error 값 업데이트
 
             #Conponent별 Q function 학습
             loss[i] = self.q_evals[i].train_on_batch(states, q_target)

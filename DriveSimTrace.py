@@ -71,7 +71,7 @@ class DriveSimulator(object):
         self.agtSize = (60,40)
         self.agtPos = (100, self.CENTER_LANE - self.agtSize[1]/2)
         self.agtRot = -math.pi/2
-        self.agtV = 5.0
+        self.agtV = 0.0
         self.agtRect = pygame.Rect(self.agtPos, self.agtSize)
         self.agtImg_org = pygame.image.load("carimg.png").convert()
         self.agtImg = pygame.transform.rotate(self.agtImg_org, self.agtRot*180/math.pi)
@@ -190,14 +190,15 @@ class DriveSimulator(object):
         # (2-1)
         # 에이전트 판단 근거 표시
         decomposition = ['Get to Finish', 'Collide with Obstacle', 'Collide with Wall', 'Time Limit', 'Speed Limit']
+        my_font = pygame.font.SysFont('NanumGothic', 20)
         if len(pred_C) > 0:
-            my_font = pygame.font.SysFont('NanumGothic', 20)
             for i in range(len(pred_C)):
                 pred = np.array(pred_C[i])[0,action]
                 pred = round(pred, 3)
                 txt = decomposition[i] + ' : ' + str(pred)
                 text_surface = my_font.render(txt, False, (255,255,255))
                 self.screen.blit(text_surface, (20, self.SCREEN_H + 20+ 25*i))
+        
 
 
 
@@ -230,8 +231,10 @@ class DriveSimulator(object):
             self.sim_over_why = '시간 초과'
             self.stpRwd[3] = -3.0
 
-        if self.agtV >= 10.0: #과속 시
+        if self.agtV >= 7.0 or self.agtV <= -5.0: #과속 시
             self.stpRwd[4] = -0.01
+            text_surface = my_font.render("High Speed!", False, (255,255,255))
+            self.screen.blit(text_surface, (self.agtPos[0]+60, self.agtPos[1]+30))
 
 
         # 중앙선으로부터 떨어진 정도에 따라 음의 보상
@@ -241,6 +244,8 @@ class DriveSimulator(object):
 
         self.agtRwd += self.stpRwd # 누적 보상 저장
 
+        text_surface = my_font.render(f"Accumulated Reward: {self.agtRwd}", False, (255,255,255))
+        self.screen.blit(text_surface, (20, self.SCREEN_H + 20 + 25*len(pred_C)))
 
         #Update sim_state
         self.sim_prev_state = self.sim_state
