@@ -117,7 +117,7 @@ class DriveSimulator(object):
             (self.agtPos[0]-self.FINISH_LANE), # 에이전트 위치 (x)
             (self.agtPos[1]-self.CENTER_LANE), # 에이전트 위치 (y)
             (self.obsPos[0] - self.agtPos[0]), # 장애물 위치 (x)
-            (self.obsPos[0] - self.agtPos[1]), # 장애물 위치 (y)
+            (self.obsPos[1] - self.agtPos[1]), # 장애물 위치 (y)
             (self.obsRad)])                    # 장애물 크기
 
         sim_cur_state /= 200.0 #정규화(normalization)
