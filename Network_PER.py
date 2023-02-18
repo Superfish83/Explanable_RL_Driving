@@ -111,7 +111,7 @@ class ReplayBuffer():
 class Agent(): #신경망 학습을 관장하는 클래스
     def __init__(self, lr, gamma, n_actions, epsilon, batch_size, input_dims, per_on,
         eps_dec = 1e-4, eps_end = 0.01, mem_size = 500000, fc1_dims=128,
-        fc2_dims=128, replace = 20):
+        fc2_dims=128, replace = 100):
         self.action_space = [i for i in range(n_actions)]
         self.gamma = gamma
         self.epsilon = epsilon
@@ -120,7 +120,7 @@ class Agent(): #신경망 학습을 관장하는 클래스
         self.replace = replace
         self.batch_size = batch_size
 
-        self.rwd_components = 5
+        self.rwd_components = 3
         self.learn_step_counter = 0
         self.memory = ReplayBuffer(mem_size, input_dims, per_on, self.rwd_components)
         self.episode_frame_cnt = 0 # BlackBox Prioritization을 위한 카운터
@@ -239,6 +239,6 @@ class Agent(): #신경망 학습을 관장하는 클래스
     def load_model(self, path):
         
         for i in range(self.rwd_components):
-            self.q_evals[i].load_weights(path + f'_r{i}')
-            self.q_nexts[i].load_weights(path + f'_r{i}')
+            self.q_evals[i].load_weights(path + f'_r{i}').expect_partial()
+            self.q_nexts[i].load_weights(path + f'_r{i}').expect_partial()
         print("loaded weights from " + path)

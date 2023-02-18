@@ -71,11 +71,11 @@ class DriveSimulator(object):
         self.agtSize = (60,40)
         self.agtPos = (100, self.CENTER_LANE - self.agtSize[1]/2)
         self.agtRot = -math.pi/2
-        self.agtV = 0.0
+        self.agtV = 4.0
         self.agtRect = pygame.Rect(self.agtPos, self.agtSize)
         self.agtImg_org = pygame.image.load("carimg.png").convert()
         self.agtImg = pygame.transform.rotate(self.agtImg_org, self.agtRot*180/math.pi)
-        self.agtRwd = np.zeros(5) # 축적된 보상
+        self.agtRwd = np.zeros(3) # 축적된 보상
         
         # Obs(Obstacle)
         self.obsRad = 100 #random.randint(75,125)
@@ -114,6 +114,8 @@ class DriveSimulator(object):
 
     def get_sim_state(self):
         sim_cur_state = np.array([
+            (self.agtV * 200), # 에이전트 속력
+            (self.agtRot * 200), #에이전트가 바라보는 방향
             (self.agtPos[0]-self.FINISH_LANE), # 에이전트 위치 (x)
             (self.agtPos[1]-self.CENTER_LANE), # 에이전트 위치 (y)
             (self.obsPos[0] - self.agtPos[0]), # 장애물 위치 (x)
@@ -122,11 +124,13 @@ class DriveSimulator(object):
 
         sim_cur_state /= 200.0 #정규화(normalization)
 
-        sim_state = self.sim_state
-        if sim_state.size == 0:
-            self.sim_state = np.array([sim_cur_state, sim_cur_state, sim_cur_state, sim_cur_state])
-        else:
-            self.sim_state = np.array([sim_cur_state, sim_state[0], sim_state[1], sim_state[2]])
+        self.sim_state = np.array([sim_cur_state])
+
+        #sim_state = self.sim_state
+        #if sim_state.size == 0:
+        #    self.sim_state = np.array([sim_cur_state, sim_cur_state])
+        #else:
+        #    self.sim_state = np.array([sim_cur_state, sim_state[0]])
 
         return self.sim_state
 
@@ -141,8 +145,7 @@ class DriveSimulator(object):
         elif action == 1:
             self.agtV += 0.5
         elif action == 2:
-            self.agtV -= 0.5
-            self.agtV = max(self.agtV, 0.0)
+            self.agtV *= 0.9
         elif action == 3:
             self.agtRot += math.pi/24
         elif action == 4:
@@ -196,7 +199,7 @@ class DriveSimulator(object):
 
         # (2-1)
         # 에이전트 판단 근거 표시
-        decomposition = ['Get to Finish', 'Collide with Obstacle', 'Collide with Wall', 'Time Limit', 'Speed Limit']
+        decomposition = ['Reach Finish Line', 'Collide with Obstacle', 'Collide with Wall']
         my_font = pygame.font.SysFont('NanumGothic', 20)
         if len(pred_C) > 0:
             for i in range(len(pred_C)):
@@ -211,7 +214,7 @@ class DriveSimulator(object):
 
         # (4)
         # 보상 결정하기
-        self.stpRwd = np.zeros(5) # Step Reward [목표도착, 장애물충돌, 경로이탈, 시간초과, 과속] -> Reward 분리
+        self.stpRwd = np.zeros(3) # Step Reward [목표도착, 장애물충돌, 경로이탈, 시간초과, 과속] -> Reward 분리
         self.sim_over = False
         self.sim_over_why = ''
 
@@ -220,30 +223,31 @@ class DriveSimulator(object):
             self.sim_over = True
             self.sim_over_why = '장애물 회피 성공'
             self.win_count += 1
-            self.stpRwd[0] = 5.0
+            self.stpRwd[0] = 10.0
 
         # 회피하지 못한 경우
         if self.get_obs_dist() < 0:
             self.sim_over = True
             self.sim_over_why = '장애물과 충돌'
-            self.stpRwd[1] = -3.0
+            self.stpRwd[1] = -10.0
         
         if self.agtPos[1] < 0 or self.agtPos[1] + self.agtSize[1] > self.SCREEN_H or self.agtPos[0] < 0:
             self.sim_over = True
             self.sim_over_why = '경로 이탈'
-            self.stpRwd[2] = -3.0
+            self.stpRwd[2] = -10.0
             
-        if self.t >= 400: #400 Ticks 안에 목표에 도달하지 못하면 종료
+        if self.t >= 500: #1000 Ticks 안에 목표에 도달하지 못하면 종료
             self.sim_over = True
             self.sim_over_why = '시간 초과'
+            self.stpRwd[0] = (self.agtPos[0] - self.obsPos[0]) / 100 # 목적지로부터 가까운 만큼 보상
 
-        # 시간 경과에 따른 페널티
-        self.stpRwd[3] = -0.005
+        #if self.agtV <= 1.0: #움직이지 않을 시
+        #    self.stpRwd[3] = -0.03
 
-        if self.agtV >= 7.0: #과속 시
-            self.stpRwd[4] = -0.03
-            text_surface = my_font.render("High Speed!", False, (255,255,255))
-            self.screen.blit(text_surface, (self.agtPos[0]+60, self.agtPos[1]+30))
+        #if self.agtV >= 7.0: #과속 시
+        #    self.stpRwd[3] = -0.03
+        #    text_surface = my_font.render("High Speed!", False, (255,255,255))
+        #    self.screen.blit(text_surface, (self.agtPos[0]+60, self.agtPos[1]+30))
 
         self.agtRwd += self.stpRwd # 누적 보상 저장
 
