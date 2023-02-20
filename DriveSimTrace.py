@@ -239,7 +239,7 @@ class DriveSimulator(object):
         if self.t >= 500: #1000 Ticks 안에 목표에 도달하지 못하면 종료
             self.sim_over = True
             self.sim_over_why = '시간 초과'
-            self.stpRwd[0] = (self.agtPos[0] - self.obsPos[0]) / 100 # 목적지로부터 가까운 만큼 보상
+            self.stpRwd[0] = (self.agtPos[0] - self.obsPos[0]) / 30 # 목적지로부터 가까운 만큼 보상
 
         #if self.agtV <= 1.0: #움직이지 않을 시
         #    self.stpRwd[3] = -0.03

@@ -182,6 +182,11 @@ class Agent(): #신경망 학습을 관장하는 클래스
         #print(max_actions)
         
         return max_actions, np.max(actions, axis=1)
+
+    def set_next_weight(self):
+        for i in range(self.rwd_components):
+            self.q_nexts[i].set_weights(self.q_evals[i].get_weights())
+        print("q_next weight set!")
     
     def learn(self, exp_no):
         if self.memory.mem_N < self.batch_size:
@@ -191,10 +196,10 @@ class Agent(): #신경망 학습을 관장하는 클래스
             self.memory.sample_buffer(self.batch_size, self.epsilon, exp_no)
             #alpha ~ 1.0 ~ 0.0
 
-        if self.learn_step_counter % self.replace == 0:
-            for i in range(self.rwd_components):
-                self.q_nexts[i].set_weights(self.q_evals[i].get_weights())
-            print("q_next weight set!")
+        #if self.learn_step_counter % self.replace == 0:
+        #    for i in range(self.rwd_components):
+        #        self.q_nexts[i].set_weights(self.q_evals[i].get_weights())
+        #    print("q_next weight set!")
         
         
         loss = np.zeros(self.rwd_components)
@@ -202,13 +207,16 @@ class Agent(): #신경망 학습을 관장하는 클래스
         q_t = np.zeros((len(dones), len(self.action_space))) # 전체 Component를 합산한 target Q 값
         for i in range(self.rwd_components):
             q_pred = self.q_evals[i](states)
+            next_action = np.argmax(self.q_evals[i](states_))
+
             q_next = self.q_nexts[i](states_)
             q_target = q_pred.numpy()
 
             #Component별 target Q value 계산
             for idx, terminal in enumerate(dones):
                 q_target[idx, actions[idx]] = rewards[idx, i] + \
-                    self.gamma*(np.max(q_next[idx]))*(1-int(dones[idx]))
+                    self.gamma*( q_next[idx, next_action] )*(1-int(dones[idx]))
+                    #self.gamma*( np.max(q_next[idx]) )*(1-int(dones[idx]))
             
             q_t += q_target
 
