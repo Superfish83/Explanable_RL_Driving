@@ -1,43 +1,37 @@
 from argparse import Action
-import tensorflow as tf
-import tensorflow.python.keras as keras
-from keras import optimizers
-from tensorflow.python.keras.optimizer_v2.adam import Adam
+from tensorflow import keras
 import numpy as np
-from keras.layers import Dense
-from keras.layers import Flatten
 from math import *
 
 import csv
 
-class DuelingDQN(keras.Model):
-    def __init__(self, n_actions, fc1Dims, fc2Dims):
-        super(DuelingDQN, self).__init__()
-        self.flatten = Flatten()
-        self.dense1 = Dense(fc1Dims, activation='relu')
-        self.dense2 = Dense(fc2Dims, activation='relu')
-        self.V = Dense(1, activation=None)
-        self.A = Dense(n_actions, activation=None)
+# class DuelingDQN(keras.Model):
+#     def __init__(self, n_actions, fc1Dims, fc2Dims):
+#         super(DuelingDQN, self).__init__()
+#         self.flatten = Flatten()
+#         self.dense1 = Dense(fc1Dims, activation='relu')
+#         self.dense2 = Dense(fc2Dims, activation='relu')
+#         self.V = Dense(1, activation=None)
+#         self.A = Dense(n_actions, activation=None)
     
 
-    def call(self, state):
-        x = self.flatten(state)
-        x = self.dense1(x)
-        x = self.dense2(x)
-        V = self.V(x)
-        A = self.A(x)
+#     def call(self, state):
+#         x = self.flatten(state)
+#         x = self.dense1(x)
+#         x = self.dense2(x)
+#         V = self.V(x)
+#         A = self.A(x)
         
-        Q = (V + (A - tf.reduce_mean(A, axis=1, keepdims=True)))
-        return Q
+#         Q = (V + (A - tf.reduce_mean(A, axis=1, keepdims=True)))
+#         return Q
 
-    def advantage(self, state):
-        x = self.flatten(state)
-        x = self.dense1(x)
-        x = self.dense2(x)
-        A = self.A(x)
+#     def advantage(self, state):
+#         x = self.flatten(state)
+#         x = self.dense1(x)
+#         x = self.dense2(x)
+#         A = self.A(x)
 
-        return A
-
+#         return A
 
 class ReplayBuffer():
     def __init__(self, max_size, input_shape, per_on, rwd_components):
@@ -110,7 +104,7 @@ class ReplayBuffer():
 
 class Agent(): #신경망 학습을 관장하는 클래스
     def __init__(self, lr, gamma, n_actions, epsilon, batch_size, input_dims, per_on,
-        eps_dec = 1e-4, eps_end = 0.01, mem_size = 500000, fc1_dims=128,
+        eps_dec = 1e-4, eps_end = 0.01, mem_size = 500000, fc1_dims=256,
         fc2_dims=128, replace = 100):
         self.action_space = [i for i in range(n_actions)]
         self.gamma = gamma
@@ -128,13 +122,26 @@ class Agent(): #신경망 학습을 관장하는 클래스
         # Double DQN
         self.q_evals = []
         self.q_nexts = []
+        
 
         for i in range(self.rwd_components):
-            self.q_evals.append(DuelingDQN(n_actions, fc1_dims, fc2_dims))
-            self.q_nexts.append(DuelingDQN(n_actions, fc1_dims, fc2_dims))
-            self.q_evals[i].compile(optimizer=Adam(learning_rate=lr), loss = "mse")
-            self.q_nexts[i].compile(optimizer=Adam(learning_rate=lr), loss = "mse")
+            model = keras.Sequential()
+            model.add(keras.layers.Flatten())
+            model.add(keras.layers.Dense(fc1_dims))
+            model.add(keras.layers.Activation('relu'))
+            model.add(keras.layers.Dense(fc1_dims))
+            model.add(keras.layers.Activation('relu'))
+            model.add(keras.layers.Dense(fc2_dims))
+            model.add(keras.layers.Activation('relu'))
+            model.add(keras.layers.Dense(n_actions, activation=None))
+            
+            model.build(input_shape=input_dims)
+            model.compile(optimizer=keras.optimizers.Adam(learning_rate=lr), loss = "mse")
+            self.q_evals.append(model)
 
+            model.build(input_shape=input_dims)
+            model.compile(optimizer=keras.optimizers.Adam(learning_rate=lr), loss = "mse")
+            self.q_nexts.append(model)
 
         self.init_q_next = True
 
