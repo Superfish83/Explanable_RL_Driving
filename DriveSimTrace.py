@@ -38,7 +38,7 @@ class DriveSimulator(object):
         # Screen size
         self.SCREEN_W = 1000
         self.SCREEN_H = 500
-        self.STATUS_H = 300 # Agent status monitor below screen
+        self.STATUS_H = 200 # Agent status monitor below screen
 
         # Traffic lanes
         self.CENTER_LANE = self.SCREEN_H/2
@@ -86,6 +86,7 @@ class DriveSimulator(object):
         self.sim_state = self.get_sim_state() #가장 처음 상태 구하기
 
         self.trace = []
+        self.trace_c = []
         self.explain = False #Explain Mode 여부
 
     # def get_obs_dir(self):
@@ -171,7 +172,7 @@ class DriveSimulator(object):
 
         
 
-    def render_explanation(self, shap_list, pred_list, shap_exp, pred_exp):
+    def render_explanation(self, shap_exp, pred_exp):
         font1 = pygame.font.SysFont('NanumGothic', 20)
         font2 = pygame.font.SysFont('NanumGothicBold', 20)
         
@@ -192,8 +193,7 @@ class DriveSimulator(object):
         pygame.display.flip()
 
 
-
-    def step(self, action, pred_C):
+    def step(self, action, pred_C, hesFlag=False):
         pygame.event.pump()
         self.t += 1
 
@@ -230,7 +230,6 @@ class DriveSimulator(object):
         # 에이전트 경로 그리기
         cnt = 0
         for pos in self.trace:
-            cnt+=1
             pos = (
                 pos[0] + self.agtSize[0] / 2,
                 pos[1] + self.agtSize[1] / 2
@@ -238,9 +237,10 @@ class DriveSimulator(object):
             #c = max(0, 255 - 5 * (len(self.trace) - cnt))
             #c = min(255, 30 * (len(self.trace) - cnt))
             if self.explain:
-                pygame.draw.circle(self.screen, (150,150,250), pos, 5)
+                pygame.draw.circle(self.screen, self.trace_c[cnt], pos, 5)
             else:
                 pygame.draw.circle(self.screen, (220,220,220), pos, 5)
+            cnt+=1
 
 
         # 에이전트 그리기
@@ -251,6 +251,10 @@ class DriveSimulator(object):
 
         if self.t % 3 == 0:
             self.trace.append(self.agtPos)
+            if hesFlag == True:
+                self.trace_c.append((250,200,200))
+            else:
+                self.trace_c.append((200,200,250))
 
         self.agtImg = pygame.transform.rotate(self.agtImg_org, self.agtRot*180/pi)
         self.screen.blit(self.agtImg, self.agtPos)
@@ -334,7 +338,7 @@ class DriveSimulator(object):
             return self.sim_state, self.stpRwd, self.sim_over
         else:
             r = self.stpRwd
-            s, r_, o = self.step(0, pred_C)
+            s, r_, o = self.step(0, pred_C, hesFlag=hesFlag)
             return s, r+r_, o
     
     def quit(self):
