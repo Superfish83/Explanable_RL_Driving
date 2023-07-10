@@ -136,11 +136,11 @@ class Agent(): #신경망 학습을 관장하는 클래스
             model.add(keras.layers.Dense(n_actions, activation=None))
             
             model.build(input_shape=input_dims)
-            model.compile(optimizer=keras.optimizers.Adam(learning_rate=lr), loss = "mse")
+            model.compile(optimizer=keras.optimizers.legacy.Adam(learning_rate=lr), loss = "mse")
             self.q_evals.append(model)
 
             model.build(input_shape=input_dims)
-            model.compile(optimizer=keras.optimizers.Adam(learning_rate=lr), loss = "mse")
+            model.compile(optimizer=keras.optimizers.legacy.Adam(learning_rate=lr), loss = "mse")
             self.q_nexts.append(model)
 
         self.init_q_next = True
